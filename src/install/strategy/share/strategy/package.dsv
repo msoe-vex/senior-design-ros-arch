@@ -1,0 +1,6 @@
+source;share/strategy/hook/pythonpath.ps1
+source;share/strategy/hook/pythonpath.dsv
+source;share/strategy/hook/pythonpath.sh
+source;share/strategy/hook/ament_prefix_path.ps1
+source;share/strategy/hook/ament_prefix_path.dsv
+source;share/strategy/hook/ament_prefix_path.sh
