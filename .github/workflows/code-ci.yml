@@ -1,0 +1,26 @@
+name: Code Checks
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    container: raiderrobotics/container-registry:rr-foxy-base
+    steps:
+    - name: ✔️ Checkout Repository and Submodules
+      uses: actions/checkout@v2
+      with:
+        submodules: recursive
+    - name: 🔨 Build Project
+      run: |
+        /bin/bash -c "source /opt/ros/foxy/setup.bash && colcon build"
+  test:
+    needs: build
+    runs-on: ubuntu-20.04
+    container: raiderrobotics/container-registry:rr-foxy-base
+    steps:
+    - name: ✔️ Checkout Repository and Submodules
+      uses: actions/checkout@v2
+      with:
+        submodules: recursive
+    - name: 🧪 Execute Unit Tests
+      run: |
+        /bin/bash -c "source /opt/ros/foxy/setup.bash && colcon test"
