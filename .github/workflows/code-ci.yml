@@ -23,4 +23,4 @@ jobs:
         submodules: recursive
     - name: 🧪 Execute Unit Tests
       run: |
-        /bin/bash -c "source /opt/ros/foxy/setup.bash && colcon test"
+        /bin/bash -c "source /opt/ros/foxy/setup.bash && colcon build && colcon test"
