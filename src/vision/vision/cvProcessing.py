@@ -124,8 +124,11 @@ class CoreCVProcessing(Node):
                 elif obj_cls == 3.0:
                     # TODO: Retrieve robot location from odometry node and validate the properties of the parameters
                     robot_location = None
-                    state = platform_state_with_determinism(robot_location, color_image, x1, y1, x2, y2)
-                    platform = {'x': pose_x, 'y': pose_y}
+                    color_int, state = platform_state_with_determinism(robot_location, color_image, x1, y1, x2, y2)
+                    color = None
+                    if color_int != -1:
+                        color = 'blue' if color_int == 0 else 'red'
+                    platform = {'x': pose_x, 'y': pose_y, 'c': color}
                     self.field_representation['platforms'].append(platform)
                 elif obj_cls == 4.0:
                     # TODO: Validate the properties of the parameters
