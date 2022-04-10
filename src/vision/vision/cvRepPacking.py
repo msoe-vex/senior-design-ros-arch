@@ -12,13 +12,15 @@ from .enumerations import Color
 
 class RepPackingSubscriber(Node):
     def __init__(self):
-        super().__init__('subscriber')
+        super().__init__('rep_packing_subscriber')
         self.field_representation = None
         self.field_view = None
         self.pose = None
         self.red_platform = RedPlatform(PlatformState.LEVEL)
         self.blue_platform = BluePlatform(PlatformState.LEVEL)
-        self.team_color = Color.RED # TODO: Make dynamic/configurable
+        # self.rep_publisher = self.create_publisher(# TODO: find class instance message type, 'field_rep/update', 10)
+        # TODO: Make team color configurable
+        self.team_color = Color.RED 
 
         self.CV_subscription = self.create_subscription(
             String,
@@ -33,8 +35,6 @@ class RepPackingSubscriber(Node):
             10)
 
     def CV_callback(self, msg):
-        # TODO: Determine format of field view message, (current assumption of format:
-        # dict w/ list of dicts for each identified element, element dicts contain x, y, s[tate], c[olor])
         self.field_view = message_converter.convert_ros_message_to_dictionary(msg.data)
         self.concat_field_info()
 
