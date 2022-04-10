@@ -77,9 +77,9 @@ class RepPackingSubscriber(Node):
                         platform_state = PlatformState.RIGHT
                     
                     if plat_state != -1:
-                        if plat_color == 0:
+                        if plat_color == 'blue':
                             self.blue_platform = BluePlatform(platform_state)
-                        elif plat_color == 1:
+                        elif plat_color == 'red':
                             self.red_platform = RedPlatform(platform_state)
             
             if self.team_color == Color.RED:
