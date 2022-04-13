@@ -9,8 +9,9 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from rospy_message_converter import message_converter
 
-# TODO: Move NMS and state classification to project and fix imports
+# TODO: Move NMS and state classification to project and fix imports, add model and vector transform
 from utils.general import non_max_suppression
+from vector_transform import FrameTransform
 from platform_state import platform_state_with_determinism
 from goal_state import is_goal_tipped
 
@@ -20,6 +21,7 @@ class CoreCVProcessing(Node):
         self.color = None
         self.depth = None
         self.pose = None
+        self.tf2 = FrameTransform()
         self.bridge = CvBridge()
         self.field_representation = defaultdict(list)
         self.rep_publisher = self.create_publisher(String, 'cv_rep_packing', 10)
@@ -115,12 +117,15 @@ class CoreCVProcessing(Node):
             nms_results = non_max_suppression(results, conf_thres=0.5)[0]
             torch.cuda.synchronize()
 
+            # Calculates the distance of all game objects in frame
             for obj in nms_results:
-                dist = float(obj_distance(obj, depth_frame).cpu())
+                dist = float(self.obj_distance(obj, self.depth).cpu())
                 x1, y1, x2, y2, conf, obj_cls = obj.cpu()
-                # TODO: Publish object and its distance to the 'cv_camera_tf/image' topic
-                # TODO: Subscribe to the 'cv_camera_tf/coordinates' topic and store the transformed object coordinates
-                pose_x, pose_y = None
+                robot_location = (self.pose['x'], self.pose['y'], self.pose['t'])
+                object_location = self.tf2.get_object_location(x1, y1, x2, y2, dist, robot_location)
+                pose_x, pose_y = object_location[0], object_location[1]
+
+                # Adds object to field representation
                 if obj_cls == 0.0:
                     state = is_goal_tipped(color_image, x1, y1, x2, y2)
                     blue_goal = {'x': pose_x, 'y': pose_y, 'c': 'blue', 's': state}
