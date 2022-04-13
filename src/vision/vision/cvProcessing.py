@@ -19,12 +19,13 @@ class CoreCVProcessing(Node):
         super().__init__('core_cv_processor')
         self.color = None
         self.depth = None
+        self.pose = None
         self.bridge = CvBridge()
         self.field_representation = defaultdict(list)
         self.rep_publisher = self.create_publisher(String, 'cv_rep_packing', 10)
         
         # Calculation for object distance based on bounding box dimensions in inches
-        self.FOCAL_LENGTH = ((448.0-172.0) * (24.0*0)) / (11.0)
+        self.FOCAL_LENGTH = ((448.0-172.0) * (24.0)) / (11.0)
         # Width of game objects in inches
         self.LABELS = {0:'Blue Goal', 1:'Blue Robot', 2:'Neutral Goal', 3:'Platform', 4:'Red Goal', 5:'Red Robot', 6:'Ring'}
         self.OBJECT_WIDTH_DICT = {"6":3.5, "0":12.5, "2":12.5, "4":12.5, "1":5.5, "5":5.5, "3":53.0}
@@ -41,12 +42,23 @@ class CoreCVProcessing(Node):
             self.depth_callback,
             10)
 
+        self.odom_subscription = self.create_subscription(
+            String,
+            'robot/odometry/get_pose',
+            self.odom_callback,
+            10)
+
+    def odom_callback(self, msg):
+        # Current assumption position of format: int dict w/ x, y, t[heta]
+        self.pose = message_converter.convert_ros_message_to_dictionary(msg.data)
+        self.process_frame()
+
     def color_callback(self, msg):
         self.color = self.bridge.imgmsg_to_cv2(msg.data, desired_encoding='passthrough')
         self.process_frame()
 
     def depth_callback(self, msg):
-        # Rectified depth image, contains float depths in m
+        # Rectified depth image, contains float depths in meters
         self.depth = self.bridge.imgmsg_to_cv2(msg.data, desired_encoding='passthrough')
         self.process_frame()
 
@@ -61,12 +73,12 @@ class CoreCVProcessing(Node):
         x = (x1 + x2)/2 
         y = (y1 + y2)/2
         
-        # extract average distance from depth map
-        center = self.depth[x, y]
-        right = self.depth[x+2, y]
-        top = self.depth[x, y+2]
-        left = self.depth[x-2, y]
-        bottom = self.depth[x, y-2]
+        # Extract average distance from depth map
+        center = self.depth[x, y] * 39.3700787402
+        right = self.depth[x+2, y] * 39.3700787402
+        top = self.depth[x, y+2] * 39.3700787402
+        left = self.depth[x-2, y] * 39.3700787402
+        bottom = self.depth[x, y-2] * 39.3700787402
         pixels = [center, right, top, left, bottom]
         points = float(sum([1 for x in pixels if x > 0]))
         depth_distance_inches = (center if center is not None else 0 +\
@@ -85,7 +97,7 @@ class CoreCVProcessing(Node):
         return distance
 
     def process_frame(self):
-        if self.color is not None and self.depth is not None:
+        if self.color is not None and self.depth is not None and self.pose is not None:
             # Format color frame and move to GPU
             # TODO: Verify whether this conversion is still needed
             color_image = np.ascontiguousarray(self.color).transpose((2, 0, 1))
@@ -121,9 +133,8 @@ class CoreCVProcessing(Node):
                     neutral_goal = {'x': pose_x, 'y': pose_y, 'c': 'neutral', 's': state}
                     self.field_representation['goals'].append(neutral_goal)
                 elif obj_cls == 3.0:
-                    # TODO: Retrieve robot location from odometry node
-                    robot_location = None
-                    color_int, state = platform_state_with_determinism(robot_location, color_image, x1, y1, x2, y2)
+                    # TODO: Refactor the format of the parameters for the bounding box
+                    color_int, state = platform_state_with_determinism((self.pose['x'], self.pose['y'], self.pose['t']), color_image, x1, y1, x2, y2)
                     color = None
                     if color_int != -1:
                         color = 'blue' if color_int == 0 else 'red'
@@ -140,11 +151,17 @@ class CoreCVProcessing(Node):
                     ring = {'x': pose_x, 'y': pose_y}
                     self.field_representation['rings'].append(ring)
                 
+            self.field_representation['pose_x'] = self.pose['x']
+            self.field_representation['pose_y'] = self.pose['y']
+                
             # Publishing field representation to the 'cv_rep_packing' topic
             msg = String()
             msg.data = message_converter.convert_dictionary_to_ros_message(dict(self.field_representation))
             self.rep_publisher.publish(msg)
             
+            # Reset frame buffer
+            self.color = None  
+            self.depth = None          
 
 def main(args=None):
     rclpy.init(args=args)
