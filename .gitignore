@@ -1,6 +1,5 @@
 # ROS Log directories
-src/log/**
-src/strategy/log/**
+log/
 
 # Prerequisites
 *.d
