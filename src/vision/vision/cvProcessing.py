@@ -62,7 +62,7 @@ class CoreCVProcessing(Node):
         self.process_frame()
 
     def color_callback(self, msg):
-        self.color = self.bridge.imgmsg_to_cv2(msg.data, desired_encoding='passthrough')
+        self.color = self.bridge.imgmsg_to_cv2(msg.data, desired_encoding='bgr8')
         self.process_frame()
 
     def depth_callback(self, msg):
@@ -107,7 +107,7 @@ class CoreCVProcessing(Node):
     def process_frame(self):
         if self.color is not None and self.depth is not None and self.pose is not None:
             # Format color frame and move to GPU
-            # TODO: Verify whether this conversion is still needed
+            # BGR8 image, HWC -> CHW transformation
             color_image = np.ascontiguousarray(self.color).transpose((2, 0, 1))
             torch.cuda.synchronize()
             model_input = torch.from_numpy(color_image).cuda().half()
