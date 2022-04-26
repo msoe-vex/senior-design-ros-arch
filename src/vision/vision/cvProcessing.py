@@ -9,11 +9,12 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from rospy_message_converter import message_converter
 
-# TODO: Move NMS and state classification to project and fix imports, add model and vector transform
 from utils.general import non_max_suppression
-from vector_transform import FrameTransform
-from platform_state import platform_state_with_determinism
-from goal_state import is_goal_tipped
+from utils.transform.vector_transform import FrameTransform
+from utils.state.platform_state import platform_state_with_determinism
+from utils.state.goal_state import is_goal_tipped
+from model.detect import non_max_suppression
+from model.experimental import attempt_load
 
 class CoreCVProcessing(Node):
     def __init__(self):
@@ -23,8 +24,13 @@ class CoreCVProcessing(Node):
         self.pose = None
         self.tf2 = FrameTransform()
         self.bridge = CvBridge()
+        self.model = attempt_load('static/best.pt', map_location=torch.device('cuda:0'))
         self.field_representation = defaultdict(list)
         self.rep_publisher = self.create_publisher(String, 'cv_rep_packing', 10)
+        
+        # Initializing model
+        self.model.model.half()
+        self.model.forward(torch.zeros((1, 3, 480, 640)).to(torch.device('cuda:0')).type(torch.half))
         
         # Calculation for object distance based on bounding box dimensions in inches
         self.FOCAL_LENGTH = ((448.0-172.0) * (24.0)) / (11.0)
@@ -110,7 +116,7 @@ class CoreCVProcessing(Node):
             torch.cuda.synchronize()
 
             # Run model inference
-            results = model(model_input)[0]
+            results = self.model(model_input)[0]
             torch.cuda.synchronize()
 
             # Run NMS algorithm
@@ -138,7 +144,6 @@ class CoreCVProcessing(Node):
                     neutral_goal = {'x': pose_x, 'y': pose_y, 'c': 'neutral', 's': state}
                     self.field_representation['goals'].append(neutral_goal)
                 elif obj_cls == 3.0:
-                    # TODO: Refactor the format of the parameters for the bounding box
                     color_int, state = platform_state_with_determinism((self.pose['x'], self.pose['y'], self.pose['t']), color_image, x1, y1, x2, y2)
                     color = None
                     if color_int != -1:
